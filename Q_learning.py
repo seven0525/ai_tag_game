@@ -36,7 +36,8 @@ theta_0 = np.array([[np.nan, 1, 1, np.nan, 1],  # coordinate[0][0]
                     [1, np.nan, 1, 1, 1],  # coordinate[2][3]
                     [1, 1, np.nan, np.nan, 1],  # coordinate[3][0]
                     [1, 1, np.nan, 1, 1],  # coordinate[3][1]
-                    [1, 1, np.nan, 1, 1],  # coordinate[3][2] ※coordinate[3][3]はゴールだから方策なし
+                    [1, 1, np.nan, 1, 1],  # coordinate[3][2]
+                    [1, np.nan, np.nan, 1, 1],
                     ])
 
 goal_state = 15       #ゴールの状態s
@@ -62,11 +63,12 @@ pi_0 = simple_convert_into_pi_from_theta(theta_0)
 def get_action(s, Q, epsilon, pi_0):
     direction = ["up", "right", "down", "left", "stop"]
 
+    cnt = 0
     while True:
         r = np.random.rand()
 
         # 行動を決める
-        if r < epsilon:
+        if r < epsilon or cnt >= 1:
             # εの確率でランダムに動く
             #next_direction = np.random.choice(direction, p=pi_0[s, :])
             next_direction = np.random.choice(direction, p=pi_0[s])
@@ -74,8 +76,10 @@ def get_action(s, Q, epsilon, pi_0):
         else:
             # Qの最大値の行動を採用する
             #next_direction = direction[np.nanargmax(Q[s, :])]
+            print("get_action_s: " + str(s))
             next_direction = direction[np.nanargmax(Q[s])]
-            print("エラー: " + str(np.nanargmax(Q[s])))
+            print("最大選択: " + str(np.nanargmax(Q[s])))
+            cnt += 1
         
 
         # 行動をindexに
@@ -107,7 +111,7 @@ def get_action(s, Q, epsilon, pi_0):
             break
 
     print("action: " + str(action))
-    return action       #なんかよくわからんけどここでnp.nanが入ることがあった(action != np.nanを入れてない時)
+    return action
 
 
 def get_s_next(s, a, Q, epsilon, pi_0):
@@ -201,20 +205,24 @@ def calc_Q(Q, epsilon, eta, gamma, pi, coordinate):
 
         # 報酬を与え,　次の行動を求めます
         if h_s_next == goal_state:
+            print("人間よ、報奨金だぞ")
             h_r += 1000  # ゴールにたどり着いたなら報酬を与える
             d_r += -1000
             h_a_next = np.nan
-        else:
-            #h_r += 0
+        elif h_s_next != goal_state:
+            print("人間よ、罰だぞ")
+            h_r -= 10
             h_a_next = get_action(h_s_next, h_Q, epsilon, pi)
             # 次の行動a_nextを求めます。
 
         if d_s_next == h_s_next or train_turn >= 30:
+            print("鬼よ、報酬だぞ")
             d_r += 1000
             h_r += -1000
             d_a_next = np.nan
-        else:
-            #d_r = 0
+        elif d_s_next != h_s_next and train_turn < 30:
+            print("鬼よ、罰を与えてやろう")
+            d_r -= 10
             d_a_next = get_action(d_s_next, d_Q, epsilon, pi)
             # 次の行動a_nextを求めます。
 
@@ -286,7 +294,7 @@ def Q_learning_exe(Q, agent, coordinate):
 
         # 200エピソード繰り返す
         episode += 1
-        if episode > 500:
+        if episode > 100:
             break
 
     #with open("./result/state_value.txt", mode='w') as f:
@@ -333,12 +341,11 @@ def state_to_coordinate_change(s, corrdinate):
                 return coordinate[i][j]
             cnt += 1
 
-def AI(Q, s):
+def AI(Q, s, agent, next_player_state):
     global pi_0
 
     direction = ["up", "right", "down", "left", "stop"]
-
-    #next_direction = direction[np.nanargmax(Q[s, :])]
+                
     next_direction = direction[np.nanargmax(Q[s])]
     print("next_direction: " + str(next_direction))
 
@@ -346,56 +353,25 @@ def AI(Q, s):
         # 行動から次の状態を決める
         if next_direction == "up" and (s-4) != 9:
             s_next = s - 4  # 上に移動するときは状態の数字が3小さくなる
-            break
         elif next_direction == "right" and (s+1) != 9:
             s_next = s + 1  # 右に移動するときは状態の数字が1大きくなる
-            break
         elif next_direction == "down" and (s+4) != 9:
             s_next = s + 4  # 下に移動するときは状態の数字が3大きくなる
-            break
         elif next_direction == "left" and (s-1) != 9:
             s_next = s - 1  # 左に移動するときは状態の数字が1小さくなる
-            break
         else:
             s_next = s
-            break
+
+        if agent == "demon":
+            if next_player_state == s_next:
+                 next_direction = np.random.choice(direction, p=pi_0[s])
+            else:
+                break
 
         #next_direction = np.random.choice(direction, p=pi_0[s, :])
-        next_direction = np.random.choice(direction, p=pi_0[s])
+        #next_direction = np.random.choice(direction, p=pi_0[s])
 
     return s_next
-
-'''
-def demon_AI(Q, s):
-    global pi_0
-
-    direction = ["up", "right", "down", "left", "stop"]
-
-    next_direction = direction[np.nanargmax(Q[s, :])]
-    print("next_direction: " + str(next_direction))
-
-    while True:
-        # 行動から次の状態を決める
-        if next_direction == "up" and (s-4) != 9:
-            s_next = s - 4  # 上に移動するときは状態の数字が3小さくなる
-            break
-        elif next_direction == "right" and (s+1) != 9:
-            s_next = s + 1  # 右に移動するときは状態の数字が1大きくなる
-            break
-        elif next_direction == "down" and (s+4) != 9:
-            s_next = s + 4  # 下に移動するときは状態の数字が3大きくなる
-            break
-        elif next_direction == "left" and (s-1) != 9:
-            s_next = s - 1  # 左に移動するときは状態の数字が1小さくなる
-            break
-        else:
-            s_next = s
-            break
-
-        next_direction = np.random.choice(direction, p=pi_0[s, :])
-
-    return s_next
-'''
 
 if __name__ == "__main__":
 
@@ -440,7 +416,6 @@ if __name__ == "__main__":
         else:
             print("ちゃんと選べよおお")
     
-
     # 初期の行動価値関数Qを設定
 
     [a, b] = theta_0.shape  # 行と列の数をa, bに格納
@@ -479,6 +454,7 @@ if __name__ == "__main__":
                 
                 turn_cnt += 1       #ターン数のカウント
                 print(str(turn_cnt) + "ターン目！！")
+                #player_state = ally
 
                 if event.key == K_ESCAPE:   # Escキーが押されたとき
                     pygame.quit()
@@ -521,9 +497,10 @@ if __name__ == "__main__":
                     print("絶対動かないマンになるマン！！")
 
                 if agent == "human":
+                    next_player_state = coordinate_to_state_change(ally, coordinate)
                     state = coordinate_to_state_change(DEMON_AGENT_POSITION, coordinate)
                     print("now_state: " + str(state))
-                    enemy = AI(d_Q, state)      #ここで敵の行動を選出
+                    enemy = AI(d_Q, state, agent, next_player_state)      #ここで敵の行動を選出
                     enemy = state_to_coordinate_change(enemy, coordinate)
 
                     HUMAN_AGENT_POSITION = ally         #実際にはここで代入することで動かせるよ
@@ -531,16 +508,13 @@ if __name__ == "__main__":
 
                     if enemy == ally or turn_cnt >= 50:
                         print("AI(鬼)の勝ち！！")
-                        pygame.quit()
-                        sys.exit()
                     elif ally == GOAL_POSITION:
                         print("君(人)の勝ち！！")
-                        pygame.quit()
-                        sys.exit()
                 else:
+                    next_player_state = coordinate_to_state_change(ally, coordinate)
                     state = coordinate_to_state_change(HUMAN_AGENT_POSITION, coordinate)
                     print("now_state: " + str(state))
-                    enemy = AI(h_Q, state)      #ここで敵の行動を選出
+                    enemy = AI(h_Q, state, agent, next_player_state)      #ここで敵の行動を選出
                     enemy = state_to_coordinate_change(enemy, coordinate)
                     print("enemy: " + str(enemy))
 
@@ -549,9 +523,5 @@ if __name__ == "__main__":
 
                     if enemy == GOAL_POSITION:
                         print("AI(人)の勝ち！！")
-                        pygame.quit()
-                        sys.exit()
                     elif ally == enemy:
                         print("君(鬼)の勝ち！！")
-                        pygame.quit()
-                        sys.exit()
